@@ -6,7 +6,8 @@ const BASE_URL = "https://api.open-meteo.com/v1/forecast";
 
 export async function getWeather(
   latitude: number,
-  longitude: number
+  longitude: number,
+  signal?: AbortSignal,
 ): Promise<OpenMeteoResponse> {
 
   const response = await axios.get<OpenMeteoResponse>(
@@ -25,13 +26,14 @@ export async function getWeather(
         daily:
           "temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum",
 
-        timezone: "Europe/Stockholm",
+        timezone: "auto",
         forecast_days: 7,
 
         temperature_unit: "celsius",
         wind_speed_unit: "kmh",
         precipitation_unit: "mm",
       },
+      signal,
       timeout: 10000,
     }
   );
