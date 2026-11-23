@@ -15,12 +15,22 @@ export function parseWeather(
   fetchedAt: string
 ): WeatherForecast {
 
-  // 1. Aktuellt väder
+  const currentData = data.current;
+  if (
+    typeof data.timezone !== "string" ||
+    !currentData ||
+    typeof currentData.time !== "string" ||
+    !Number.isFinite(currentData.temperature_2m) ||
+    !Number.isFinite(currentData.weather_code)
+  ) {
+    throw new Error("Invalid current weather");
+  }
+
   const current: CurrentWeather = {
-    observedAt: data.current.time,
-    temperatureC: data.current.temperature_2m,
-    weatherCode: data.current.weather_code,
-    windSpeedKmh: data.current.wind_speed_10m,
+    observedAt: currentData.time,
+    temperatureC: currentData.temperature_2m,
+    weatherCode: currentData.weather_code,
+    windSpeedKmh: currentData.wind_speed_10m,
   };
 
   // 2. Kontrollera timprognoserna
@@ -78,11 +88,13 @@ export function parseWeather(
       const weatherCode = daily.weather_code[index];
 
       if (
-        minTemp == null ||
-        maxTemp == null ||
-        weatherCode == null
+        typeof date !== "string" ||
+        !Number.isFinite(Date.parse(date)) ||
+        minTemp == null || !Number.isFinite(minTemp) ||
+        maxTemp == null || !Number.isFinite(maxTemp) ||
+        weatherCode == null || !Number.isFinite(weatherCode)
       ) {
-        throw new Error("Dagsprognosen saknar obligatoriska värden");
+        throw new Error("Invalid daily forecast");
       }
 
       return {

@@ -1,3 +1,4 @@
+import { Link } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -13,34 +14,23 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ForecastList } from "../components/ForecastList";
 import { WeatherCard } from "../components/WeatherCard";
-import { mockWeather } from "../data/mockWeather";
-import type { WeatherForecast } from "../models/Weather";
+import { useWeather } from "../hooks/useWeather";
 
 export default function Index() {
   const [cityQuery, setCityQuery] = useState("");
-  const [forecast, setForecast] = useState<WeatherForecast | null>(mockWeather);
-  const [isLoading, setIsLoading] = useState(false);
+  const { state, requestedCity, searchCity, retry } = useWeather();
+  const forecast = state.status === "success" ? state.forecast : null;
+  const isLoading = state.status === "loading";
   const cityName = cityQuery.trim();
   const canSearch = cityName.length > 0 && !isLoading;
 
-  async function searchCity() {
+  function submitSearch() {
     if (!canSearch) {
       return;
     }
 
     Keyboard.dismiss();
-    setIsLoading(true);
-
-    // Simulate loading so it can be tested with local data.
-    await new Promise<void>((resolve) => setTimeout(resolve, 600));
-
-    if (cityName.toLowerCase() === mockWeather.location.name.toLowerCase()) {
-      setForecast(mockWeather);
-    } else {
-      setForecast(null);
-    }
-
-    setIsLoading(false);
+    searchCity(cityName);
   }
 
   return (
@@ -56,7 +46,7 @@ export default function Index() {
             placeholderTextColor="#52687e"
             value={cityQuery}
             onChangeText={setCityQuery}
-            onSubmitEditing={searchCity}
+            onSubmitEditing={submitSearch}
             editable={!isLoading}
             autoCorrect={false}
             returnKeyType="search"
@@ -65,34 +55,49 @@ export default function Index() {
           <Pressable
             accessibilityRole="button"
             disabled={!canSearch}
-            onPress={searchCity}
+            onPress={submitSearch}
             style={[styles.searchButton, !canSearch && styles.disabledButton]}
           >
             <Text style={styles.buttonText}>Sök</Text>
           </Pressable>
         </View>
-        <Text style={styles.hint}>Testdata för Stockholm</Text>
 
         {isLoading && (
           <View style={styles.loading}>
             <ActivityIndicator color="#185388" accessible={false} />
             <Text accessibilityRole="alert" style={styles.hint}>
-              Laddar väder för {cityName}…
+              Laddar väder för {requestedCity}…
             </Text>
           </View>
         )}
-        {!isLoading && forecast === null && (
-          <Text accessibilityRole="alert" style={styles.message}>
-            Ingen testprognos hittades. Prova Stockholm.
-          </Text>
+        {state.status === "error" && (
+          <>
+            <Text accessibilityRole="alert" style={styles.message}>
+              {state.error.message}
+            </Text>
+            {state.error.code !== "PLACE_NOT_FOUND" && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={retry}
+                style={[styles.searchButton, styles.retryButton]}
+              >
+                <Text style={styles.buttonText}>Försök igen</Text>
+              </Pressable>
+            )}
+          </>
         )}
-        {!isLoading && forecast && (
+        {forecast && (
           <>
             <WeatherCard
               cityName={forecast.location.name}
               temperatureC={forecast.current.temperatureC}
               weatherCode={forecast.current.weatherCode}
             />
+            <Text style={styles.hint}>
+              Väder från <Link href="https://open-meteo.com/" style={styles.sourceLink}>Open-Meteo</Link>
+              {" · Platser från "}<Link href="https://www.geonames.org/" style={styles.sourceLink}>GeoNames</Link>
+              {" · "}<Link href="https://creativecommons.org/licenses/by/4.0/" style={styles.sourceLink}>CC BY 4.0</Link>
+            </Text>
             <ForecastList days={forecast.days} />
           </>
         )}
@@ -136,6 +141,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 12,
     backgroundColor: "#185388",
+  },
+  retryButton: {
+    alignSelf: "flex-start",
+  },
+  sourceLink: {
+    textDecorationLine: "underline",
   },
   disabledButton: {
     backgroundColor: "#52687e",
