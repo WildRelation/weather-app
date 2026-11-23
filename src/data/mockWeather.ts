@@ -1,0 +1,77 @@
+import type { WeatherForecast } from "../models/Weather";
+
+export const mockWeather: WeatherForecast = {
+  location: {
+    id: "stockholm",
+    name: "Stockholm",
+    latitude: 59.3293,
+    longitude: 18.0686,
+    country: "Sweden",
+  },
+  timezone: "Europe/Stockholm",
+  fetchedAt: "2026-11-23T11:00:00Z",
+  current: {
+    observedAt: "2026-11-23T12:00",
+    temperatureC: 5,
+    weatherCode: 3,
+    windSpeedKmh: 12,
+  },
+  days: [
+    {
+      date: "2026-11-23",
+      minTemperatureC: 2,
+      maxTemperatureC: 6,
+      weatherCode: 3,
+      precipitationSumMm: 0,
+      hours: [],
+    },
+    {
+      date: "2026-11-24",
+      minTemperatureC: 1,
+      maxTemperatureC: 5,
+      weatherCode: 2,
+      precipitationSumMm: 0,
+      hours: [],
+    },
+    {
+      date: "2026-11-25",
+      minTemperatureC: 0,
+      maxTemperatureC: 4,
+      weatherCode: 61,
+      precipitationSumMm: 2,
+      hours: [],
+    },
+    {
+      date: "2026-11-26",
+      minTemperatureC: -1,
+      maxTemperatureC: 3,
+      weatherCode: 0,
+      precipitationSumMm: 0,
+      hours: [],
+    },
+    {
+      date: "2026-11-27",
+      minTemperatureC: 1,
+      maxTemperatureC: 5,
+      weatherCode: 2,
+      precipitationSumMm: 0,
+      hours: [],
+    },
+    {
+      date: "2026-11-28",
+      minTemperatureC: 3,
+      maxTemperatureC: 7,
+      weatherCode: 61,
+      precipitationSumMm: 3,
+      hours: [],
+    },
+    {
+      date: "2026-11-29",
+      minTemperatureC: 2,
+      maxTemperatureC: 6,
+      weatherCode: 3,
+      precipitationSumMm: 0,
+      hours: [],
+    },
+  ],
+};
