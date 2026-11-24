@@ -1,49 +1,12 @@
-import { isAxiosError } from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
 
-import type { AppSettings, Location, WeatherError, WeatherScreenState } from "../models/Weather";
-import { parseGeocodingResult } from "../parsers/geocodingParser";
-import { parseWeather } from "../parsers/weatherParser";
-import { searchCityApi } from "../services/searchCityApi";
-import { getWeather } from "../services/weatherApi";
+import type { AppSettings, Location, WeatherScreenState } from "../models/Weather";
+import { defaultLocation, loadWeather } from "../repositories/weatherRepository";
+import type { WeatherRequest } from "../repositories/weatherRepository";
+import { createWeatherStorage } from "../storage/weatherStorage";
 
-const defaultLocation: Location = {
-  id: "2673730",
-  name: "Stockholm",
-  latitude: 59.3294,
-  longitude: 18.0687,
-  country: "Sverige",
-};
-
-type WeatherRequest = { cityName: string | null } | { location: Location };
-
-function getWeatherError(error: unknown): WeatherError {
-  if (!isAxiosError(error)) {
-    return {
-      code: "INVALID_RESPONSE",
-      message: "Vädertjänsten skickade ett ogiltigt svar. Försök igen.",
-    };
-  }
-
-  if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
-    return {
-      code: "TIMEOUT",
-      message: "Anropet tog för lång tid. Försök igen.",
-    };
-  }
-
-  if (error.code === "ERR_NETWORK") {
-    return {
-      code: "OFFLINE",
-      message: "Kunde inte ansluta. Kontrollera din internetanslutning och försök igen.",
-    };
-  }
-
-  return {
-    code: "API_ERROR",
-    message: "Vädertjänsten kunde inte hämta data. Försök igen.",
-  };
-}
+const weatherStorage = createWeatherStorage(AsyncStorage);
 
 export function useWeather(refreshIntervalMinutes: AppSettings["refreshIntervalMinutes"]) {
   const [request, setRequest] = useState<WeatherRequest>({ cityName: null });
@@ -61,46 +24,19 @@ export function useWeather(refreshIntervalMinutes: AppSettings["refreshIntervalM
     const { signal } = controller;
 
     async function loadForecast() {
-      try {
-        let location: Location | null = defaultLocation;
-        if ("location" in request) {
-          location = request.location;
-        } else if (request.cityName !== null) {
-          location = parseGeocodingResult(await searchCityApi(request.cityName, signal));
-        }
-
-        if (signal.aborted) {
-          return;
-        }
-
-        if (location === null) {
-          setState({
-            status: "error",
-            forecast: null,
-            error: { code: "PLACE_NOT_FOUND", message: `Hittade ingen plats för ”${requestedCity}”.` },
-          });
-          return;
-        }
-
-        const data = await getWeather(location.latitude, location.longitude, signal);
-        const forecast = parseWeather(data, location, new Date().toISOString());
-
-        if (!signal.aborted) {
-          setState({ status: "success", forecast, error: null, isStale: false });
-        }
-      } catch (error) {
-        if (!signal.aborted) {
-          setState({ status: "error", forecast: null, error: getWeatherError(error) });
-        }
+      const result = await loadWeather(request, weatherStorage, signal);
+      if (!signal.aborted && result !== null) {
+        setState(result);
       }
     }
 
     void loadForecast();
     return () => controller.abort();
-  }, [request, requestedCity]);
+  }, [request]);
 
   useEffect(() => {
-    if (state.status === "loading" || state.error?.code === "PLACE_NOT_FOUND") return;
+    if (state.status === "loading" || state.error?.code === "PLACE_NOT_FOUND"
+      || state.error?.code === "INVALID_INPUT") return;
 
     const timer = setTimeout(() => {
       if (state.status === "success") {
@@ -136,7 +72,7 @@ export function useWeather(refreshIntervalMinutes: AppSettings["refreshIntervalM
   return {
     state,
     requestedCity,
-    searchCity: (cityName: string) => requestForecast({ cityName }),
+    searchCity: (cityName: string, searchQuery?: string) => requestForecast({ cityName, searchQuery }),
     searchCoordinates,
     searchLocation,
     retry: () => requestForecast(request),

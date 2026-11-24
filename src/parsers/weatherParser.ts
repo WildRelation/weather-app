@@ -1,13 +1,27 @@
 
 import type { OpenMeteoResponse } from "../models/OpenMeteo";
-
 import type {
-    CurrentWeather,
-    DailyForecast,
-    HourlyForecast,
-    Location,
-    WeatherForecast,
+  CurrentWeather,
+  DailyForecast,
+  HourlyForecast,
+  Location,
+  WeatherForecast,
 } from "../models/Weather";
+
+function isLocalTimestamp(value: unknown): value is string {
+  return typeof value === "string"
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(value)
+    && Number.isFinite(Date.parse(`${value}Z`));
+}
+
+function hasMatchingSeries(time: unknown, ...series: unknown[]): boolean {
+  return Array.isArray(time) && time.length > 0
+    && series.every((values) => Array.isArray(values) && values.length === time.length);
+}
+
+function numberOrNull(value: number | null): number | null {
+  return value !== null && Number.isFinite(value) ? value : null;
+}
 
 export function parseWeather(
   data: OpenMeteoResponse,
@@ -15,11 +29,11 @@ export function parseWeather(
   fetchedAt: string
 ): WeatherForecast {
 
-  const currentData = data.current;
+  const currentData = data?.current;
   if (
-    typeof data.timezone !== "string" ||
     !currentData ||
-    typeof currentData.time !== "string" ||
+    typeof data.timezone !== "string" ||
+    !isLocalTimestamp(currentData.time) ||
     !Number.isFinite(currentData.temperature_2m) ||
     !Number.isFinite(currentData.weather_code)
   ) {
@@ -30,57 +44,46 @@ export function parseWeather(
     observedAt: currentData.time,
     temperatureC: currentData.temperature_2m,
     weatherCode: currentData.weather_code,
-    windSpeedKmh: currentData.wind_speed_10m,
+    windSpeedKmh: numberOrNull(currentData.wind_speed_10m),
   };
 
-  // 2. Kontrollera timprognoserna
   const hourly = data.hourly;
-  const count = hourly.time.length;
-
-  if (
-    hourly.temperature_2m.length !== count ||
-    hourly.weather_code.length !== count ||
-    hourly.precipitation.length !== count ||
-    hourly.wind_speed_10m.length !== count
-  ) {
-    throw new Error("Ogiltiga timprognoser");
+  if (!hourly || !hasMatchingSeries(
+    hourly.time, hourly.temperature_2m, hourly.weather_code, hourly.precipitation, hourly.wind_speed_10m,
+  )) {
+    throw new Error("Invalid hourly forecast series");
   }
 
-  // 3. Omvandla timprognoser
   const hours: HourlyForecast[] = hourly.time.map(
     (time, index) => {
       const temperature = hourly.temperature_2m[index];
       const weatherCode = hourly.weather_code[index];
 
-      if (temperature == null || weatherCode == null) {
-        throw new Error("Timprognosen saknar obligatoriska värden");
+      if (
+        !isLocalTimestamp(time)
+        || temperature === null || !Number.isFinite(temperature)
+        || weatherCode === null || !Number.isFinite(weatherCode)
+      ) {
+        throw new Error("Invalid hourly forecast");
       }
 
       return {
         time,
         temperatureC: temperature,
         weatherCode,
-        precipitationMm: hourly.precipitation[index],
-        windSpeedKmh: hourly.wind_speed_10m[index],
+        precipitationMm: numberOrNull(hourly.precipitation[index]),
+        windSpeedKmh: numberOrNull(hourly.wind_speed_10m[index]),
       };
     }
   );
 
-  // 4. Kontrollera dagsprognoserna
   const daily = data.daily;
-  const dayCount = daily.time.length;
-
-  if (
-    dayCount !== 7 ||
-    daily.temperature_2m_min.length !== dayCount ||
-    daily.temperature_2m_max.length !== dayCount ||
-    daily.weather_code.length !== dayCount ||
-    daily.precipitation_sum.length !== dayCount
-  ) {
-    throw new Error("Ogiltig 7-dagarsprognos");
+  if (!daily || !hasMatchingSeries(
+    daily.time, daily.temperature_2m_min, daily.temperature_2m_max, daily.weather_code, daily.precipitation_sum,
+  ) || daily.time.length !== 7) {
+    throw new Error("Invalid seven-day forecast series");
   }
 
-  // 5. Omvandla dagsprognoser
   const days: DailyForecast[] = daily.time.map(
     (date, index) => {
       const minTemp = daily.temperature_2m_min[index];
@@ -89,7 +92,10 @@ export function parseWeather(
 
       if (
         typeof date !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
         !Number.isFinite(Date.parse(date)) ||
+        new Date(date).toISOString().slice(0, 10) !== date ||
+        (index > 0 && Date.parse(date) - Date.parse(daily.time[index - 1]) !== 86_400_000) ||
         minTemp == null || !Number.isFinite(minTemp) ||
         maxTemp == null || !Number.isFinite(maxTemp) ||
         weatherCode == null || !Number.isFinite(weatherCode)
@@ -102,9 +108,7 @@ export function parseWeather(
         minTemperatureC: minTemp,
         maxTemperatureC: maxTemp,
         weatherCode,
-        precipitationSumMm: daily.precipitation_sum[index],
-
-        // Koppla timmarna till rätt datum
+        precipitationSumMm: numberOrNull(daily.precipitation_sum[index]),
         hours: hours.filter((hour) =>
           hour.time.startsWith(date + "T")
         ),
@@ -112,7 +116,6 @@ export function parseWeather(
     }
   );
 
-  // 6. Returnera appens WeatherForecast
   return {
     location,
     timezone: data.timezone,

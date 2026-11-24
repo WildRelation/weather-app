@@ -12,9 +12,9 @@ User types place name or coordinates
       ↓
 Home screen (View) → useWeather (state / ViewModel)
       ↓
-Geocoding service (only for place names)
+weatherRepository (resolve location, fetch and save forecast)
       ↓
-weatherRepository (coordinates → weather request)
+geocode.maps.co through the Expo API route (only for place names)
       ↓
 weatherApi (fetch raw Open-Meteo JSON)
       ↓
@@ -27,7 +27,9 @@ useWeather sets success/error/loading state
 Home / Details render typed domain models
 ```
 
-If the network fails: check local cache for the **same location**, return an explicitly stale forecast if found; otherwise show a meaningful error and no blank screen. Loading a new city must not misleadingly label the previous city's data as new. Prevent slow earlier requests from overriding a more recent search.
+AsyncStorage holds the latest parsed forecast for each location ID. After a successful city search, the repository also saves the normalized query and its resolved location ID. That mapping allows a repeat search to find the correct forecast after a restart when geocoding is unavailable.
+
+On a connectivity error or timeout, the repository reads the saved forecast for the resolved location or, if geocoding failed, the saved ID for the exact normalized query. The screen shows the saved forecast together with the error and retry button. Without a matching entry, it shows the error. A cancelled request cannot update the screen.
 
 ## Folder ownership
 
@@ -37,10 +39,10 @@ If the network fails: check local cache for the **same location**, return an exp
 | Network / repository / local cache | `src/services/`, `src/repositories/`, `src/storage/` | Data lead | UI lead |
 | Navigation / views / design | `app/`, `src/components/` | UI lead | Data lead |
 | Hooks and app integration | `src/hooks/` | Shared | Shared |
-| Tests / docs / oral prep | `__tests__/`, docs, SPEC | Shared | Shared |
+| Tests / docs / oral prep | `tests/`, docs, SPEC | Shared | Shared |
 
 ## Shared data contract
-`src/models/Weather.ts` defines the **application** model, independent from external API field names. Only `weatherParser.ts` knows the external JSON shape. The UI partner can make mock objects conforming to `WeatherForecast` without waiting for the API integration.
+`src/models/Weather.ts` defines the **application** model, independent from external API field names. `geocodingParser.ts` maps geocode.maps.co results to `Location`, and `weatherParser.ts` maps Open-Meteo JSON to `WeatherForecast`.
 
 ## Selected API field mapping (proposed)
 
@@ -54,14 +56,14 @@ Daily/hourly fields are parallel arrays in the API: validate their lengths, hand
 
 ## API notes
 - Weather: `https://api.open-meteo.com/v1/forecast` with chosen `current`, `daily`, `hourly` variables.
-- The assignment lists `geocode.maps.co` and SMHI autocomplete for place search. Current maps.co documentation requires an API key; choose the provider together, obtain key legally if needed, and keep it out of commits. Do not treat an Expo client key as a secret that cannot be extracted.
+- Place search uses the international option in the assignment, `geocode.maps.co`. The Expo API route sends the server's `GEOCODE_MAPS_API_KEY` in the upstream Authorization header. The client sends only the search text to the Expo route.
 - During development KTH's SMHI-format proxy can be used if you implement the SMHI interface; the **final build must call a real API**.
 
 ## Error and state rules
 - `idle`: nothing selected yet.
 - `loading`: request underway; identify which city is being loaded in UI.
-- `success`: complete forecast; `isStale` tells whether cached data is shown.
-- `error`: show a readable error and optionally same-location cached forecast.
+- `success`: live forecast, or a saved forecast with `isStale` and the request error.
+- `error`: show a readable error when the request has no usable forecast.
 - Coordinate validation, empty geocoding results, HTTP failures, malformed JSON and timeouts have distinct test cases.
 
 ## Collaborating on GitHub
@@ -78,7 +80,6 @@ Daily/hourly fields are parallel arrays in the API: validate their lengths, hand
 - At least 20 distinct UX interaction scenarios on a physical device or official simulator.
 
 ## Questions to resolve together
-- Which approved geocoding option can be used reliably and with acceptable key handling?
 - Is the same cached day's hourly forecast sufficient for detail and today views?
 - Which UI preference besides refresh interval is simplest and useful? (Theme or temperature units.)
 - When is the oral presentation scheduled? Submission must be at least one day before it.

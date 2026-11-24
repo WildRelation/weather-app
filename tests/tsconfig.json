@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "rootDir": "../src",
+    "outDir": "../.expo/data-tests",
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "../src/app/api/city-suggestions+api.ts",
+    "../src/app/api/geocode+api.ts",
+    "../src/repositories/weatherRepository.ts",
+    "../src/storage/weatherStorage.ts"
+  ]
+}

@@ -26,13 +26,3 @@ export interface OpenMeteoResponse {
     precipitation_sum: (number | null)[];
   };
 }
-
-export interface OpenMeteoGeocodingResponse {
-  results?: {
-    id: number;
-    name: string;
-    latitude: number;
-    longitude: number;
-    country?: string;
-  }[];
-}

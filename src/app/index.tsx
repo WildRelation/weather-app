@@ -19,10 +19,14 @@ import { SavedForecastNotice } from "../components/SavedForecastNotice";
 import { WeatherCard } from "../components/WeatherCard";
 import { useAppPreferences } from "../context/AppPreferencesContext";
 import { useWeatherContext } from "../context/WeatherContext";
+import { useCitySuggestions } from "../hooks/useCitySuggestions";
+import type { CitySuggestion } from "../models/Weather";
 import { formatForecastDate } from "../utils/formatForecastDate";
 
+type CityInput = { text: string; showSuggestions: boolean; searchQuery?: string };
+
 export default function Index() {
-  const [cityQuery, setCityQuery] = useState("");
+  const [cityInput, setCityInput] = useState<CityInput>({ text: "", showSuggestions: false });
   const { state, requestedCity, searchCity, searchCoordinates, retry } = useWeatherContext();
   const { favorites, settings, isReady, addFavorite, removeFavorite } = useAppPreferences();
   const forecast = state.status === "success" ? state.forecast : null;
@@ -35,16 +39,31 @@ export default function Index() {
     ? `Timprognos · ${formatForecastDate(today.date)}`
     : "Timprognos idag";
   const isLoading = state.status === "loading";
-  const cityName = cityQuery.trim();
+  const cityName = cityInput.text.trim();
   const canSearch = cityName.length > 0 && !isLoading;
+  const suggestions = useCitySuggestions(cityInput.showSuggestions && !isLoading ? cityName : "");
 
   function submitSearch() {
     if (!canSearch) {
       return;
     }
 
+    setCityInput({ ...cityInput, showSuggestions: false });
     Keyboard.dismiss();
-    searchCity(cityName);
+    searchCity(cityName, cityInput.searchQuery);
+  }
+
+  function selectSuggestion(suggestion: CitySuggestion) {
+    if (isLoading) return;
+
+    setCityInput({ text: suggestion.name, searchQuery: suggestion.query, showSuggestions: false });
+    Keyboard.dismiss();
+    searchCity(suggestion.name, suggestion.query);
+  }
+
+  function submitCoordinates(latitude: number, longitude: number) {
+    setCityInput({ ...cityInput, showSuggestions: false });
+    searchCoordinates(latitude, longitude);
   }
 
   function toggleFavorite() {
@@ -72,8 +91,8 @@ export default function Index() {
             accessibilityLabel="Stad"
             placeholder="Sök stad"
             placeholderTextColor="#52687e"
-            value={cityQuery}
-            onChangeText={setCityQuery}
+            value={cityInput.text}
+            onChangeText={(text) => setCityInput({ text, showSuggestions: true })}
             onSubmitEditing={submitSearch}
             editable={!isLoading}
             autoCorrect={false}
@@ -89,7 +108,28 @@ export default function Index() {
             <Text style={styles.buttonText}>Sök</Text>
           </Pressable>
         </View>
-        <CoordinateSearch disabled={isLoading} onSearch={searchCoordinates} />
+        {suggestions.length > 0 && (
+          <View style={styles.suggestions}>
+            {suggestions.map((suggestion) => (
+              <Pressable
+                key={suggestion.query}
+                accessibilityRole="button"
+                accessibilityLabel={[suggestion.name, suggestion.context].filter(Boolean).join(", ")}
+                onPress={() => selectSuggestion(suggestion)}
+                style={({ pressed }) => [styles.suggestion, pressed && styles.pressedSuggestion]}
+              >
+                <Text style={styles.suggestionName}>{suggestion.name}</Text>
+                {suggestion.context !== "" && (
+                  <Text style={styles.hint}>{suggestion.context}</Text>
+                )}
+              </Pressable>
+            ))}
+            <Text style={styles.suggestionsSource}>
+              Ortsförslag från <Link href="https://www.geonames.org/" style={styles.sourceLink}>GeoNames</Link>
+            </Text>
+          </View>
+        )}
+        <CoordinateSearch disabled={isLoading} onSearch={submitCoordinates} />
 
         {isLoading && (
           <View style={styles.loading}>
@@ -99,12 +139,12 @@ export default function Index() {
             </Text>
           </View>
         )}
-        {state.status === "error" && (
+        {state.error && (
           <>
             <Text accessibilityRole="alert" style={styles.message}>
               {state.error.message}
             </Text>
-            {state.error.code !== "PLACE_NOT_FOUND" && (
+            {state.error.code !== "PLACE_NOT_FOUND" && state.error.code !== "INVALID_INPUT" && (
               <Pressable
                 accessibilityRole="button"
                 onPress={retry}
@@ -136,8 +176,8 @@ export default function Index() {
             </Pressable>
             <Text style={styles.hint}>
               Väder från <Link href="https://open-meteo.com/" style={styles.sourceLink}>Open-Meteo</Link>
-              {" · Platser från "}<Link href="https://www.geonames.org/" style={styles.sourceLink}>GeoNames</Link>
-              {" · "}<Link href="https://creativecommons.org/licenses/by/4.0/" style={styles.sourceLink}>CC BY 4.0</Link>
+              {" ("}<Link href="https://creativecommons.org/licenses/by/4.0/" style={styles.sourceLink}>CC BY 4.0</Link>{")"}
+              {" · Platser © "}<Link href="https://www.openstreetmap.org/copyright" style={styles.sourceLink}>OpenStreetMaps bidragsgivare</Link>
             </Text>
             <HourlyForecastList
               title={hourlyTitle}
@@ -173,6 +213,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
   },
+  suggestions: {
+    borderWidth: 1,
+    borderColor: "#a9bed4",
+    borderRadius: 12,
+    backgroundColor: "#ffffff",
+    overflow: "hidden",
+  },
+  suggestion: {
+    minHeight: 48,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#a9bed4",
+  },
+  pressedSuggestion: { backgroundColor: "#d6e8fa" },
+  suggestionName: { color: "#122a43", fontSize: 16, fontWeight: "600" },
+  suggestionsSource: { color: "#3c5873", fontSize: 12, paddingHorizontal: 12, paddingVertical: 6 },
   navigation: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   navigationLink: {
     paddingHorizontal: 14,

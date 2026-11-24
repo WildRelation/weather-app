@@ -7,6 +7,12 @@ export interface Location {
   country?: string;
 }
 
+export interface CitySuggestion {
+  name: string;
+  context: string;
+  query: string;
+}
+
 export interface CurrentWeather {
   observedAt: string; // ISO-like local time returned by the API
   temperatureC: number;
@@ -62,5 +68,6 @@ export interface WeatherError {
 export type WeatherScreenState =
   | { status: 'idle'; forecast: null; error: null }
   | { status: 'loading'; forecast: WeatherForecast | null; error: null }
-  | { status: 'success'; forecast: WeatherForecast; error: null; isStale: boolean }
+  | { status: 'success'; forecast: WeatherForecast; error: null; isStale: false }
+  | { status: 'success'; forecast: WeatherForecast; error: WeatherError; isStale: true }
   | { status: 'error'; forecast: WeatherForecast | null; error: WeatherError };
