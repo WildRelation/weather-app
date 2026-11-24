@@ -12,14 +12,24 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { CoordinateSearch } from "../components/CoordinateSearch";
 import { ForecastList } from "../components/ForecastList";
+import { HourlyForecastList } from "../components/HourlyForecastList";
+import { SavedForecastNotice } from "../components/SavedForecastNotice";
 import { WeatherCard } from "../components/WeatherCard";
 import { useWeather } from "../hooks/useWeather";
+import { formatForecastDate } from "../utils/formatForecastDate";
 
 export default function Index() {
   const [cityQuery, setCityQuery] = useState("");
-  const { state, requestedCity, searchCity, retry } = useWeather();
+  const { state, requestedCity, searchCity, searchCoordinates, retry } = useWeather();
   const forecast = state.status === "success" ? state.forecast : null;
+  const isStale = state.status === "success" && state.isStale;
+  const forecastDate = forecast?.current.observedAt.slice(0, 10);
+  const today = forecast?.days.find((day) => day.date === forecastDate);
+  const hourlyTitle = isStale && today
+    ? `Timprognos · ${formatForecastDate(today.date)}`
+    : "Timprognos idag";
   const isLoading = state.status === "loading";
   const cityName = cityQuery.trim();
   const canSearch = cityName.length > 0 && !isLoading;
@@ -61,6 +71,7 @@ export default function Index() {
             <Text style={styles.buttonText}>Sök</Text>
           </Pressable>
         </View>
+        <CoordinateSearch disabled={isLoading} onSearch={searchCoordinates} />
 
         {isLoading && (
           <View style={styles.loading}>
@@ -88,6 +99,7 @@ export default function Index() {
         )}
         {forecast && (
           <>
+            {isStale && <SavedForecastNotice />}
             <WeatherCard
               cityName={forecast.location.name}
               temperatureC={forecast.current.temperatureC}
@@ -98,7 +110,12 @@ export default function Index() {
               {" · Platser från "}<Link href="https://www.geonames.org/" style={styles.sourceLink}>GeoNames</Link>
               {" · "}<Link href="https://creativecommons.org/licenses/by/4.0/" style={styles.sourceLink}>CC BY 4.0</Link>
             </Text>
-            <ForecastList days={forecast.days} />
+            <HourlyForecastList title={hourlyTitle} hours={today?.hours ?? []} />
+            <ForecastList
+              cityName={forecast.location.name}
+              days={forecast.days}
+              isStale={isStale}
+            />
           </>
         )}
       </ScrollView>

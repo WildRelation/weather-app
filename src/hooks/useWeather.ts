@@ -15,6 +15,8 @@ const defaultLocation: Location = {
   country: "Sverige",
 };
 
+type WeatherRequest = { cityName: string | null } | { location: Location };
+
 function getWeatherError(error: unknown): WeatherError {
   if (!isAxiosError(error)) {
     return {
@@ -44,23 +46,28 @@ function getWeatherError(error: unknown): WeatherError {
 }
 
 export function useWeather() {
-  const [request, setRequest] = useState<{ cityName: string | null }>({ cityName: null });
+  const [request, setRequest] = useState<WeatherRequest>({ cityName: null });
   const [state, setState] = useState<WeatherScreenState>({
     status: "loading",
     forecast: null,
     error: null,
   });
+  const requestedCity = "location" in request
+    ? request.location.name
+    : request.cityName ?? defaultLocation.name;
 
   useEffect(() => {
     const controller = new AbortController();
     const { signal } = controller;
-    const { cityName } = request;
 
     async function loadForecast() {
       try {
-        const location = cityName === null
-          ? defaultLocation
-          : parseGeocodingResult(await searchCityApi(cityName, signal));
+        let location: Location | null = defaultLocation;
+        if ("location" in request) {
+          location = request.location;
+        } else if (request.cityName !== null) {
+          location = parseGeocodingResult(await searchCityApi(request.cityName, signal));
+        }
 
         if (signal.aborted) {
           return;
@@ -70,7 +77,7 @@ export function useWeather() {
           setState({
             status: "error",
             forecast: null,
-            error: { code: "PLACE_NOT_FOUND", message: `Hittade ingen plats för ”${cityName}”.` },
+            error: { code: "PLACE_NOT_FOUND", message: `Hittade ingen plats för ”${requestedCity}”.` },
           });
           return;
         }
@@ -90,17 +97,29 @@ export function useWeather() {
 
     void loadForecast();
     return () => controller.abort();
-  }, [request]);
+  }, [request, requestedCity]);
 
-  function requestForecast(cityName: string | null) {
+  function requestForecast(nextRequest: WeatherRequest) {
     setState({ status: "loading", forecast: null, error: null });
-    setRequest({ cityName });
+    setRequest({ ...nextRequest });
+  }
+
+  function searchCoordinates(latitude: number, longitude: number) {
+    requestForecast({
+      location: {
+        id: `coordinates:${latitude},${longitude}`,
+        name: `${latitude}, ${longitude}`,
+        latitude,
+        longitude,
+      },
+    });
   }
 
   return {
     state,
-    requestedCity: request.cityName ?? defaultLocation.name,
-    searchCity: requestForecast,
-    retry: () => requestForecast(request.cityName),
+    requestedCity,
+    searchCity: (cityName: string) => requestForecast({ cityName }),
+    searchCoordinates,
+    retry: () => requestForecast(request),
   };
 }
