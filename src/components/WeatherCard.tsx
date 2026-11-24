@@ -1,20 +1,23 @@
 import { StyleSheet, Text, View } from "react-native";
 
+import type { AppSettings } from "../models/Weather";
+import { formatTemperature } from "../utils/formatTemperature";
 import { getWeatherCondition } from "../utils/weatherCondition";
 
 type WeatherCardProps = {
   cityName: string;
   temperatureC: number;
   weatherCode: number;
+  temperatureUnit: AppSettings["temperatureUnit"];
 };
 
-export function WeatherCard({ cityName, temperatureC, weatherCode }: WeatherCardProps) {
+export function WeatherCard({ cityName, temperatureC, weatherCode, temperatureUnit }: WeatherCardProps) {
   const condition = getWeatherCondition(weatherCode);
 
   return (
     <View style={styles.card}>
       <Text accessibilityRole="header" style={styles.city}>{cityName}</Text>
-      <Text style={styles.temperature}>{temperatureC}°C</Text>
+      <Text style={styles.temperature}>{formatTemperature(temperatureC, temperatureUnit)}</Text>
       <Text style={styles.condition}>{condition.icon} {condition.label}</Text>
     </View>
   );

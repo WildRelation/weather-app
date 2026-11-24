@@ -3,7 +3,9 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { SavedForecastNotice } from "../components/SavedForecastNotice";
+import { useAppPreferences } from "../context/AppPreferencesContext";
 import { formatForecastDate } from "../utils/formatForecastDate";
+import { formatTemperature } from "../utils/formatTemperature";
 import { getWeatherCondition } from "../utils/weatherCondition";
 
 type ForecastDayParams = {
@@ -18,6 +20,7 @@ type ForecastDayParams = {
 };
 
 export default function ForecastDay() {
+  const { settings } = useAppPreferences();
   const { cityName, date, min, max, weatherCode, precipitation, maxWind, saved } =
     useLocalSearchParams<ForecastDayParams>();
 
@@ -43,8 +46,12 @@ export default function ForecastDay() {
               <Text accessibilityRole="header" style={styles.city}>{cityName}</Text>
               <Text style={styles.description}>{formatForecastDate(date)}</Text>
               <Text style={styles.condition}>{condition.icon} {condition.label}</Text>
-              <Text style={styles.description}>Lägsta temperatur: {min}°C</Text>
-              <Text style={styles.description}>Högsta temperatur: {max}°C</Text>
+              <Text style={styles.description}>
+                Lägsta temperatur: {formatTemperature(Number(min), settings.temperatureUnit)}
+              </Text>
+              <Text style={styles.description}>
+                Högsta temperatur: {formatTemperature(Number(max), settings.temperatureUnit)}
+              </Text>
               <Text style={styles.description}>Nederbörd under dagen: {precipitationLabel}</Text>
               <Text style={styles.description}>Högsta vindhastighet: {windLabel}</Text>
             </View>

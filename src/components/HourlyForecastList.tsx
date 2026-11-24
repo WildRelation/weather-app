@@ -1,14 +1,16 @@
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
-import type { HourlyForecast } from "../models/Weather";
+import type { AppSettings, HourlyForecast } from "../models/Weather";
+import { formatTemperature } from "../utils/formatTemperature";
 import { getWeatherCondition } from "../utils/weatherCondition";
 
 type HourlyForecastListProps = {
   title: string;
   hours: HourlyForecast[];
+  temperatureUnit: AppSettings["temperatureUnit"];
 };
 
-export function HourlyForecastList({ title, hours }: HourlyForecastListProps) {
+export function HourlyForecastList({ title, hours, temperatureUnit }: HourlyForecastListProps) {
   return (
     <View style={styles.section}>
       <Text accessibilityRole="header" style={styles.heading}>
@@ -24,7 +26,9 @@ export function HourlyForecastList({ title, hours }: HourlyForecastListProps) {
             return (
               <View key={hour.time} style={styles.card}>
                 <Text style={styles.time}>{hour.time.slice(11, 16)}</Text>
-                <Text style={styles.temperature}>{hour.temperatureC}°C</Text>
+                <Text style={styles.temperature}>
+                  {formatTemperature(hour.temperatureC, temperatureUnit)}
+                </Text>
                 <Text style={styles.condition}>{condition.icon} {condition.label}</Text>
                 <Text style={styles.condition}>
                   Vind: {hour.windSpeedKmh == null ? "–" : `${hour.windSpeedKmh} km/h`}

@@ -17,13 +17,17 @@ import { ForecastList } from "../components/ForecastList";
 import { HourlyForecastList } from "../components/HourlyForecastList";
 import { SavedForecastNotice } from "../components/SavedForecastNotice";
 import { WeatherCard } from "../components/WeatherCard";
-import { useWeather } from "../hooks/useWeather";
+import { useAppPreferences } from "../context/AppPreferencesContext";
+import { useWeatherContext } from "../context/WeatherContext";
 import { formatForecastDate } from "../utils/formatForecastDate";
 
 export default function Index() {
   const [cityQuery, setCityQuery] = useState("");
-  const { state, requestedCity, searchCity, searchCoordinates, retry } = useWeather();
+  const { state, requestedCity, searchCity, searchCoordinates, retry } = useWeatherContext();
+  const { favorites, settings, isReady, addFavorite, removeFavorite } = useAppPreferences();
   const forecast = state.status === "success" ? state.forecast : null;
+  const location = forecast?.location;
+  const isFavorite = favorites.some((favorite) => favorite.id === location?.id);
   const isStale = state.status === "success" && state.isStale;
   const forecastDate = forecast?.current.observedAt.slice(0, 10);
   const today = forecast?.days.find((day) => day.date === forecastDate);
@@ -43,12 +47,26 @@ export default function Index() {
     searchCity(cityName);
   }
 
+  function toggleFavorite() {
+    if (location === undefined) return;
+
+    if (isFavorite) {
+      removeFavorite(location.id);
+    } else {
+      addFavorite(location);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.screen} edges={["left", "right", "bottom"]}>
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={styles.navigation}>
+          <Link href="/favorites" style={styles.navigationLink}>Favoriter</Link>
+          <Link href="/settings" style={styles.navigationLink}>Inställningar</Link>
+        </View>
         <View style={styles.searchRow}>
           <TextInput
             accessibilityLabel="Stad"
@@ -104,17 +122,33 @@ export default function Index() {
               cityName={forecast.location.name}
               temperatureC={forecast.current.temperatureC}
               weatherCode={forecast.current.weatherCode}
+              temperatureUnit={settings.temperatureUnit}
             />
+            <Pressable
+              accessibilityRole="button"
+              onPress={toggleFavorite}
+              disabled={!isReady}
+              style={[styles.searchButton, styles.retryButton, !isReady && styles.disabledButton]}
+            >
+              <Text style={styles.buttonText}>
+                {isFavorite ? "Ta bort favorit" : "Spara som favorit"}
+              </Text>
+            </Pressable>
             <Text style={styles.hint}>
               Väder från <Link href="https://open-meteo.com/" style={styles.sourceLink}>Open-Meteo</Link>
               {" · Platser från "}<Link href="https://www.geonames.org/" style={styles.sourceLink}>GeoNames</Link>
               {" · "}<Link href="https://creativecommons.org/licenses/by/4.0/" style={styles.sourceLink}>CC BY 4.0</Link>
             </Text>
-            <HourlyForecastList title={hourlyTitle} hours={today?.hours ?? []} />
+            <HourlyForecastList
+              title={hourlyTitle}
+              hours={today?.hours ?? []}
+              temperatureUnit={settings.temperatureUnit}
+            />
             <ForecastList
               cityName={forecast.location.name}
               days={forecast.days}
               isStale={isStale}
+              temperatureUnit={settings.temperatureUnit}
             />
           </>
         )}
@@ -138,6 +172,16 @@ const styles = StyleSheet.create({
   searchRow: {
     flexDirection: "row",
     gap: 8,
+  },
+  navigation: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  navigationLink: {
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#d6e8fa",
+    color: "#122a43",
+    fontSize: 16,
+    fontWeight: "600",
   },
   input: {
     flex: 1,

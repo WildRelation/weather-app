@@ -1,17 +1,19 @@
 import { Link } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import type { DailyForecast } from "../models/Weather";
+import type { AppSettings, DailyForecast } from "../models/Weather";
 import { formatForecastDate } from "../utils/formatForecastDate";
+import { formatTemperature } from "../utils/formatTemperature";
 import { getWeatherCondition } from "../utils/weatherCondition";
 
 type ForecastListProps = {
   cityName: string;
   days: DailyForecast[];
   isStale: boolean;
+  temperatureUnit: AppSettings["temperatureUnit"];
 };
 
-export function ForecastList({ cityName, days, isStale }: ForecastListProps) {
+export function ForecastList({ cityName, days, isStale, temperatureUnit }: ForecastListProps) {
   return (
     <View style={styles.list}>
       <Text accessibilityRole="header" style={styles.heading}>7-dagarsprognos</Text>
@@ -50,7 +52,9 @@ export function ForecastList({ cityName, days, isStale }: ForecastListProps) {
                 <Text style={styles.condition}>{condition.icon} {condition.label}</Text>
               </View>
               <Text style={styles.temperature}>
-                {day.minTemperatureC}°C / {day.maxTemperatureC}°C
+                {formatTemperature(day.minTemperatureC, temperatureUnit)}
+                {" / "}
+                {formatTemperature(day.maxTemperatureC, temperatureUnit)}
               </Text>
               <Text accessible={false} aria-hidden style={styles.chevron}>›</Text>
             </Pressable>

@@ -1,7 +1,7 @@
 import { isAxiosError } from "axios";
 import { useEffect, useState } from "react";
 
-import type { Location, WeatherError, WeatherScreenState } from "../models/Weather";
+import type { AppSettings, Location, WeatherError, WeatherScreenState } from "../models/Weather";
 import { parseGeocodingResult } from "../parsers/geocodingParser";
 import { parseWeather } from "../parsers/weatherParser";
 import { searchCityApi } from "../services/searchCityApi";
@@ -45,7 +45,7 @@ function getWeatherError(error: unknown): WeatherError {
   };
 }
 
-export function useWeather() {
+export function useWeather(refreshIntervalMinutes: AppSettings["refreshIntervalMinutes"]) {
   const [request, setRequest] = useState<WeatherRequest>({ cityName: null });
   const [state, setState] = useState<WeatherScreenState>({
     status: "loading",
@@ -99,6 +99,20 @@ export function useWeather() {
     return () => controller.abort();
   }, [request, requestedCity]);
 
+  useEffect(() => {
+    if (state.status === "loading" || state.error?.code === "PLACE_NOT_FOUND") return;
+
+    const timer = setTimeout(() => {
+      if (state.status === "success") {
+        setRequest({ location: state.forecast.location });
+      } else {
+        setRequest((current) => ({ ...current }));
+      }
+    }, refreshIntervalMinutes * 60_000);
+
+    return () => clearTimeout(timer);
+  }, [refreshIntervalMinutes, state]);
+
   function requestForecast(nextRequest: WeatherRequest) {
     setState({ status: "loading", forecast: null, error: null });
     setRequest({ ...nextRequest });
@@ -115,11 +129,16 @@ export function useWeather() {
     });
   }
 
+  function searchLocation(location: Location) {
+    requestForecast({ location });
+  }
+
   return {
     state,
     requestedCity,
     searchCity: (cityName: string) => requestForecast({ cityName }),
     searchCoordinates,
+    searchLocation,
     retry: () => requestForecast(request),
   };
 }
